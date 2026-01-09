@@ -28,9 +28,16 @@
       margin-top: 12px;
       border: none;
       border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .primary {
       background: #997516;
       color: #fff;
-      font-size: 16px;
+    }
+    .secondary {
+      background: #ccc;
+      color: #333;
     }
     .hint {
       font-size: 14px;
@@ -42,34 +49,45 @@
 
 <body>
 
-  <div class="box">
+  <div class="box" id="promptBox" style="display:none;">
     <h2>Add to Home Screen</h2>
     <p>
-      Add this app to your home screen for quick and easy access.
+      Add this app to your home screen for faster access.
     </p>
 
-    <button id="installBtn" style="display:none;">
+    <button id="installBtn" class="primary" style="display:none;">
       Add to Home Screen
     </button>
 
-    <button onclick="goToApp()" style="background:#ccc;color:#333;">
+    <button class="secondary" onclick="dismissAndGo()">
       Continue to App
     </button>
 
-    <div class="hint" id="manualHint" style="display:none;"></div>
+    <div class="hint" id="manualHint"></div>
   </div>
 
   <script>
     const APP_URL = "https://pbiss-primary-pickup-system.base44.app";
+    const STORAGE_KEY = "pbiss_a2hs_prompt_seen";
+
+    // If user already saw prompt → redirect immediately
+    if (localStorage.getItem(STORAGE_KEY)) {
+      window.location.href = APP_URL;
+    }
+
+    const promptBox = document.getElementById('promptBox');
     const installBtn = document.getElementById('installBtn');
     const manualHint = document.getElementById('manualHint');
     let deferredPrompt;
 
     const ua = navigator.userAgent.toLowerCase();
-    const isAndroid = ua.includes('android');
     const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = ua.includes('android');
 
-    // Chromium-based Android browsers
+    // Show prompt UI
+    promptBox.style.display = 'block';
+
+    // Android Chromium browsers
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -80,29 +98,23 @@
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      goToApp();
+      localStorage.setItem(STORAGE_KEY, "true");
+      window.location.href = APP_URL;
     };
 
     // Manual instructions
     if (isIOS) {
       manualHint.innerHTML =
         'On iPhone or iPad: Tap <b>Share</b> → <b>Add to Home Screen</b>.';
-      manualHint.style.display = 'block';
-    }
-
-    if (isAndroid && !('onbeforeinstallprompt' in window)) {
+    } else if (isAndroid && !('onbeforeinstallprompt' in window)) {
       manualHint.innerHTML =
-        'Open browser menu (⋮) and select <b>Add to Home screen</b>.';
-      manualHint.style.display = 'block';
+        'Open browser menu (⋮) and tap <b>Add to Home screen</b>.';
     }
 
-    function goToApp() {
+    function dismissAndGo() {
+      localStorage.setItem(STORAGE_KEY, "true");
       window.location.href = APP_URL;
     }
-
-    // Auto-redirect safety net
-    setTimeout(goToApp, 10000);
   </script>
 
 </body>
