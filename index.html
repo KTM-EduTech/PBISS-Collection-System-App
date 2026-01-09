@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PBISS Primary Pickup System</title>
+  <title>PBISS Collection System</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#997516">
@@ -50,22 +50,20 @@
 <body>
 
   <div class="box" id="promptBox" style="display:none;">
-    <h2>Add to Phone</h2>
+    <h2>Add to Home Screen</h2>
     <p>
-      Install this app on your phone for quick access.
+      For faster access to PBISS Primary Pickup System,
+      add this app to your phone.
     </p>
 
-    <!-- Real install button -->
     <button id="installBtn" class="primary" style="display:none;">
       Install App
     </button>
 
-    <!-- Continue button -->
     <button class="secondary" onclick="dismissAndGo()">
       Continue to App
     </button>
 
-    <!-- Manual instructions -->
     <div class="hint" id="manualHint"></div>
   </div>
 
@@ -73,7 +71,6 @@
     const APP_URL = "https://pbiss-primary-pickup-system.base44.app";
     const STORAGE_KEY = "pbiss_install_prompt_shown";
 
-    // If already prompted → redirect immediately
     if (localStorage.getItem(STORAGE_KEY)) {
       window.location.href = APP_URL;
     }
@@ -87,17 +84,14 @@
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isAndroid = ua.includes("android");
 
-    // Show prompt container
     promptBox.style.display = "block";
 
-    // Android Chromium browsers ONLY
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       deferredPrompt = e;
       installBtn.style.display = "block";
     });
 
-    // Install button action
     installBtn.addEventListener("click", async () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
@@ -106,13 +100,12 @@
       window.location.href = APP_URL;
     });
 
-    // Manual instructions (no fake install buttons)
     if (isIOS) {
       manualHint.innerHTML =
         "On iPhone or iPad: Tap <b>Share</b> → <b>Add to Home Screen</b>.";
     } else if (isAndroid && !("onbeforeinstallprompt" in window)) {
       manualHint.innerHTML =
-        "Open the browser menu (⋮) and tap <b>Add to Home screen</b>.";
+        "Open your browser menu (⋮) and tap <b>Add to Home Screen</b>.";
     }
 
     function dismissAndGo() {
