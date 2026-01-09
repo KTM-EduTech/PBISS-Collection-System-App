@@ -40,8 +40,8 @@
       color: #333;
     }
     .hint {
-      font-size: 14px;
       margin-top: 14px;
+      font-size: 14px;
       color: #444;
     }
   </style>
@@ -50,65 +50,69 @@
 <body>
 
   <div class="box" id="promptBox" style="display:none;">
-    <h2>Add to Home Screen</h2>
+    <h2>Add to Phone</h2>
     <p>
-      Add this app to your home screen for faster access.
+      Install this app on your phone for quick access.
     </p>
 
+    <!-- Real install button -->
     <button id="installBtn" class="primary" style="display:none;">
-      Add to Home Screen
+      Install App
     </button>
 
+    <!-- Continue button -->
     <button class="secondary" onclick="dismissAndGo()">
       Continue to App
     </button>
 
+    <!-- Manual instructions -->
     <div class="hint" id="manualHint"></div>
   </div>
 
   <script>
     const APP_URL = "https://pbiss-primary-pickup-system.base44.app";
-    const STORAGE_KEY = "pbiss_a2hs_prompt_seen";
+    const STORAGE_KEY = "pbiss_install_prompt_shown";
 
-    // If user already saw prompt → redirect immediately
+    // If already prompted → redirect immediately
     if (localStorage.getItem(STORAGE_KEY)) {
       window.location.href = APP_URL;
     }
 
-    const promptBox = document.getElementById('promptBox');
-    const installBtn = document.getElementById('installBtn');
-    const manualHint = document.getElementById('manualHint');
-    let deferredPrompt;
+    const promptBox = document.getElementById("promptBox");
+    const installBtn = document.getElementById("installBtn");
+    const manualHint = document.getElementById("manualHint");
+    let deferredPrompt = null;
 
     const ua = navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
-    const isAndroid = ua.includes('android');
+    const isAndroid = ua.includes("android");
 
-    // Show prompt UI
-    promptBox.style.display = 'block';
+    // Show prompt container
+    promptBox.style.display = "block";
 
-    // Android Chromium browsers
-    window.addEventListener('beforeinstallprompt', (e) => {
+    // Android Chromium browsers ONLY
+    window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      installBtn.style.display = 'block';
+      installBtn.style.display = "block";
     });
 
-    installBtn.onclick = async () => {
+    // Install button action
+    installBtn.addEventListener("click", async () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
       localStorage.setItem(STORAGE_KEY, "true");
       window.location.href = APP_URL;
-    };
+    });
 
-    // Manual instructions
+    // Manual instructions (no fake install buttons)
     if (isIOS) {
       manualHint.innerHTML =
-        'On iPhone or iPad: Tap <b>Share</b> → <b>Add to Home Screen</b>.';
-    } else if (isAndroid && !('onbeforeinstallprompt' in window)) {
+        "On iPhone or iPad: Tap <b>Share</b> → <b>Add to Home Screen</b>.";
+    } else if (isAndroid && !("onbeforeinstallprompt" in window)) {
       manualHint.innerHTML =
-        'Open browser menu (⋮) and tap <b>Add to Home screen</b>.';
+        "Open the browser menu (⋮) and tap <b>Add to Home screen</b>.";
     }
 
     function dismissAndGo() {
