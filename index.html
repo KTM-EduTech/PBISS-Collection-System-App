@@ -1,148 +1,78 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#997516" />
-  <title>PBISS Pickup • Quick Access</title>
-
-  <!-- Very important for offline + PWA feel -->
-  <link rel="manifest" href="data:application/manifest+json,{
-    'name': 'PBISS Primary Pickup',
-    'short_name': 'PBISS',
-    'start_url': '/',
-    'display': 'standalone',
-    'background_color': '#f8f7f5',
-    'theme_color': '#997516',
-    'icons': [
-      {'src': 'https://pbiss-primary-pickup-system.base44.app/icon-192.png', 'sizes': '192x192', 'type': 'image/png'},
-      {'src': 'https://pbiss-primary-pickup-system.base44.app/icon-512.png', 'sizes': '512x512', 'type': 'image/png'}
-    ]
-  }">
-
-  <style>
-    :root {
-      --primary: #997516;
-      --primary-dark: #7a5e12;
-      --bg: #f8f7f5;
-      --card: #ffffff;
-      --text: #1a1a1a;
-      --text-light: #555;
-      --shadow: 0 6px 20px rgba(0,0,0,0.12);
-    }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100dvh;
-      display: grid;
-      place-items: center;
-      padding: 16px;
-    }
-    .card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 32px 24px;
-      max-width: 400px;
-      width: 100%;
-      box-shadow: var(--shadow);
-      text-align: center;
-    }
-    h1 { font-size: 1.7rem; margin-bottom: 12px; color: var(--primary); }
-    p { color: var(--text-light); line-height: 1.45; margin-bottom: 24px; }
-    .btn {
-      display: block;
-      width: 100%;
-      padding: 16px;
-      margin: 10px 0;
-      border: none;
-      border-radius: 12px;
-      font-size: 1.1rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-text { background: transparent; color: var(--text-light); }
-    .hint { margin-top: 20px; font-size: 0.95rem; color: var(--text-light); line-height: 1.5; }
-    .hint strong { color: var(--text); }
-  </style>
-</head>
-<body>
-
-<div class="card" id="installPrompt">
-  <h1>Add to Home Screen</h1>
-  <p>For the fastest experience with PBISS Primary Pickup — even offline</p>
-
-  <button class="btn btn-primary" id="installButton" hidden>Install App</button>
-
-  <div class="hint" id="iosHint" hidden>
-    Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>
-  </div>
-
-  <div class="hint" id="androidManualHint" hidden>
-    Tap browser menu <strong>⋮</strong> → <strong>Add to Home screen</strong>
-  </div>
-
-  <button class="btn btn-text" onclick="skipInstall()">Continue without adding</button>
-</div>
-
-<!-- Service Worker registration -->
+<!-- PWA Install Prompt + Offline hint -->
 <script>
-const STORAGE_KEY = "pbiss_install_prompt_dismissed_v2";
-const APP_URL = "https://pbiss-primary-pickup-system.base44.app";
+  // ────────────────────────────────────────────────
+  // Config
+  // ────────────────────────────────────────────────
+  const STORAGE_KEY = "pbiss_install_prompt_dismissed_v3";
+  const DAYS_TO_REMIND = 14; // optional: remind after X days if dismissed
 
-// Already decided → skip directly
-if (localStorage.getItem(STORAGE_KEY)) {
-  location.replace(APP_URL);
-}
+  // Already decided or recently dismissed → skip
+  if (localStorage.getItem(STORAGE_KEY)) {
+    const dismissedAt = localStorage.getItem(STORAGE_KEY);
+    if (Date.now() - dismissedAt < DAYS_TO_REMIND * 24 * 60 * 60 * 1000) {
+      return; // don't show again for 2 weeks
+    }
+  }
 
-// Register Service Worker for offline caching
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.debug('[SW] Registered'))
-      .catch(err => console.warn('[SW] Registration failed:', err));
+  let deferredPrompt = null;
+  const isLikelyIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // ─── Show prompt after some interaction (better UX than on load) ───
+  function showInstallPrompt() {
+    const promptShown = document.createElement("div");
+    promptPrompt.id = "pwa-install-toast";
+    promptPrompt.style.cssText = `
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #997516; color: white; padding: 16px 24px;
+      border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 9999; max-width: 90%; text-align: center;
+      font-family: system-ui; backdrop-filter: blur(8px);
+    `;
+
+    promptPrompt.innerHTML = `
+      <p style="margin:0 0 12px">Add PBISS Pickup to your home screen for faster access<br>(works offline too!)</p>
+      ${isLikelyIOS ? 
+        'Tap <b>Share</b> → <b>Add to Home Screen</b>' : 
+        '<button id="installBtn" style="background:white;color:#997516;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer">Install Now</button>'}
+      <button id="dismissBtn" style="margin-left:16px;background:transparent;color:white;border:none;opacity:0.8">× Later</button>
+    `;
+
+    document.body.appendChild(promptPrompt);
+
+    const installBtn = document.getElementById("installBtn");
+    const dismissBtn = document.getElementById("dismissBtn");
+
+    if (installBtn) {
+      installBtn.onclick = async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === "accepted") {
+            // Optional: track install success
+          }
+        }
+        cleanupAndRemember();
+      };
+    }
+
+    dismissBtn.onclick = cleanupAndRemember;
+
+    function cleanupAndRemember() {
+      promptPrompt.remove();
+      localStorage.setItem(STORAGE_KEY, Date.now());
+    }
+  }
+
+  // ─── Native prompt (Android/Chrome) ───
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    setTimeout(showInstallPrompt, 8000); // show after ~8s of usage
   });
-}
 
-const installBtn = document.getElementById("installButton");
-const iosHint = document.getElementById("iosHint");
-const androidManual = document.getElementById("androidManualHint");
-let deferredPrompt = null;
-
-// Native install prompt
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.hidden = false;
-});
-
-installBtn.addEventListener("click", async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  localStorage.setItem(STORAGE_KEY, "1");
-  location.replace(APP_URL);
-});
-
-// Device detection for manual hints
-const isLikelyIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-if (isLikelyIOS) {
-  iosHint.hidden = false;
-} else if (/android/i.test(navigator.userAgent)) {
-  setTimeout(() => {
-    if (installBtn.hidden) androidManual.hidden = false;
-  }, 1200);
-}
-
-function skipInstall() {
-  localStorage.setItem(STORAGE_KEY, "1");
-  location.replace(APP_URL);
-}
+  // iOS: show after some time if no native prompt
+  if (isLikelyIOS) {
+    setTimeout(showInstallPrompt, 12000);
+  }
 </script>
-</body>
-</html>
